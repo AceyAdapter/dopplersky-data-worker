@@ -1,0 +1,40 @@
+{
+  "name": "dopplersky-data-worker",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Protocol-native analytics collector for Dopplersky",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "lexicons:install": "ts-lex install",
+    "lexicons:update": "ts-lex install --update",
+    "codegen:lex": "ts-lex build --clear --indexFile",
+    "postinstall": "ts-lex install --ci",
+    "prebuild": "npm run codegen:lex",
+    "build": "tsc -b tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "npm run codegen:lex && tsc -b tsconfig.build.json tsconfig.test.json --pretty false",
+    "test": "npm run codegen:lex && vitest run",
+    "verify": "npm run typecheck && npm test && npm run build",
+    "migrate": "tsx src/cli.ts migrate",
+    "collect:once": "tsx src/cli.ts collect-once",
+    "track:account": "tsx src/cli.ts track-account",
+    "track:post": "tsx src/cli.ts track-post"
+  },
+  "dependencies": {
+    "@atproto/lex": "^0.3.6",
+    "@atproto/tap": "^0.4.4",
+    "dotenv": "^17.2.2",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.1",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.0"
+  }
+}

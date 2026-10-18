@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dopplersky
+      POSTGRES_USER: dopplersky
+      POSTGRES_PASSWORD: dopplersky
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dopplersky -d dopplersky"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tap:
+    image: ghcr.io/bluesky-social/indigo/tap:latest
+    environment:
+      TAP_ADMIN_PASSWORD: ${TAP_ADMIN_PASSWORD:-change-me}
+      TAP_COLLECTION_FILTERS: app.bsky.feed.post,app.bsky.feed.like,app.bsky.feed.repost,app.bsky.graph.follow
+    ports:
+      - "127.0.0.1:${TAP_PORT:-2480}:2480"
+    volumes:
+      - tap-data:/data
+    restart: unless-stopped
+
+  worker:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://dopplersky:dopplersky@postgres:5432/dopplersky
+      APPVIEW_URL: ${APPVIEW_URL:-https://public.api.bsky.app}
+      TAP_URL: http://tap:2480
+      TAP_ADMIN_PASSWORD: ${TAP_ADMIN_PASSWORD:-change-me}
+      API_SYNC_URL: ${API_SYNC_URL:-}
+      API_SYNC_TOKEN: ${API_SYNC_TOKEN:-}
+      WORKER_ID: ${WORKER_ID:-compose-1}
+      POLL_CONCURRENCY: ${POLL_CONCURRENCY:-8}
+      JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-120}
+      FOLLOWER_SAMPLE_SIZE: ${FOLLOWER_SAMPLE_SIZE:-2000}
+      FOLLOWER_FULL_SCAN_LIMIT: ${FOLLOWER_FULL_SCAN_LIMIT:-50000}
+      FOLLOWER_REFRESH_HOURS: ${FOLLOWER_REFRESH_HOURS:-24}
+      ENGAGER_SCAN_PAGE_LIMIT: ${ENGAGER_SCAN_PAGE_LIMIT:-100}
+      SYNC_BATCH_SIZE: ${SYNC_BATCH_SIZE:-500}
+      WORKER_DASHBOARD_ENABLED: "true"
+      WORKER_DASHBOARD_HOST: 0.0.0.0
+      WORKER_DASHBOARD_PORT: 3002
+      WORKER_DASHBOARD_USERNAME: dopplersky
+      WORKER_DASHBOARD_PASSWORD: ${WORKER_DASHBOARD_PASSWORD:-calypso}
+      WORKER_DASHBOARD_REFRESH_MS: 2000
+    ports:
+      - "127.0.0.1:${WORKER_DASHBOARD_PORT:-3002}:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tap:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  tap-data:

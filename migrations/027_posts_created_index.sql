@@ -1,0 +1,28 @@
+-- Support the restart replay reconciliation's cohort scan.
+--
+-- `ensureReplayJobs()` asks for the posts created inside the 30-day replay
+-- window, then looks each one up in `tracked_posts` by primary key. With only
+-- the `uri` primary key, that window had no usable access path: the planner
+-- sequentially scanned all 5.8M `analytics.posts` rows and discarded 5.7M of
+-- them on every worker start. Measured with `EXPLAIN (ANALYZE)` against a
+-- production-shaped local dataset (5.78M posts, 167.7k in-window):
+--   seq scan of 5.78M rows        -> 247 ms, 122,883 buffers
+--   index-only scan (this index)  ->  12 ms, one range read
+--
+-- Deliberately NOT paired with a bootstrap watermark. A watermark would bound
+-- the *scan* by "posts created since the last reconciliation", but a tracked
+-- post's `created_at` can predate its row: a baseline backfill inserts posts
+-- that already carry their real publication time, so a post published inside the
+-- 30-day window can land in `analytics.posts` after the watermark has passed it.
+-- The next reconciliation would then exclude it forever, leaving that post on
+-- the maintenance path only — the degraded launch curve D26 exists to prevent.
+-- The window stays absolute; only its access path changed.
+--
+-- In-transaction like the other migrations, so plain `CREATE INDEX` (not
+-- CONCURRENTLY). Against the live 5.8M-row table, build it out of band first:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS posts_created_uri_idx
+--     ON analytics.posts (created_at, uri);
+-- and this migration becomes a no-op. (`CREATE INDEX CONCURRENTLY` cannot run
+-- inside the migration runner's transaction.)
+CREATE INDEX IF NOT EXISTS posts_created_uri_idx
+  ON analytics.posts (created_at, uri);

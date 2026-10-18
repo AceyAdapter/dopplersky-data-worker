@@ -1,0 +1,10 @@
+node_modules/
+dist/
+src/lexicons/
+.env
+*.log
+.DS_Store
+coverage/
+*.tsbuildinfo
+tap-data/
+postgres-data/
